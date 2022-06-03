@@ -29,6 +29,8 @@ from models.segmentation.segmentation_helper import SemgnetationHelper
 #from models.depth.depth_helper import DepthHelper 
 import utils.control_helper as  CH
 
+from models.instructions_processed_LP.tasks_to_questions import prepositions, generate_questions_from_task, generate_questions_from_list_of_actions
+
 class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 	"""The Sem_Exp environment agent class. A seperate Sem_Exp_Env_Agent class
 	object is used for each environment thread.
@@ -177,8 +179,9 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 				self.total_cat2idx['ButterKnife'] = self.total_cat2idx['Knife'] 
 				self.cat_equate_dict['ButterKnife'] = 'Knife' #if DeskLamp is found, consider it as FloorLamp
 				
-			
-			actions_dict = {'task_type': task_type, 'list_of_actions': list_of_actions, 'second_object': second_object, 'total_cat2idx': self.total_cat2idx, 'sliced':self.sliced}
+			questions = generate_questions_from_list_of_actions(list_of_actions)
+            
+			actions_dict = {'task_type': task_type, 'list_of_actions': list_of_actions, 'second_object': second_object, 'total_cat2idx': self.total_cat2idx, 'sliced':self.sliced, 'questions': questions}
 			self.print_log('total cat2idx is ', self.total_cat2idx)
 			
 			self.actions_dict = actions_dict
