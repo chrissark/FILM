@@ -140,10 +140,10 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 			
 			self.picture_folder_name = "pictures/" + self.args.eval_split + "/"+ self.args.dn + "/" + str(self.args.from_idx + self.scene_pointer* self.args.num_processes + self.rank) + "/"
 			if self.args.save_pictures and not (self.args.from_idx + self.scene_pointer* self.args.num_processes + self.rank in self.args.skip_indices):
-				os.makedirs(self.picture_folder_name)
-				os.makedirs(self.picture_folder_name + "/fmm_dist")
-				os.makedirs(self.picture_folder_name + "/Sem")
-				os.makedirs(self.picture_folder_name + "/Sem_Map")
+				os.makedirs(self.picture_folder_name, exist_ok=True)
+				os.makedirs(self.picture_folder_name + "/fmm_dist", exist_ok=True)
+				os.makedirs(self.picture_folder_name + "/Sem", exist_ok=True)
+				os.makedirs(self.picture_folder_name + "/Sem_Map", exist_ok=True)
 			
 			
 			if self.args.test == False and not(self.args.valid_learned_lang):

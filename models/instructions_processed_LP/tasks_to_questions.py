@@ -1,4 +1,4 @@
-import ALFRED_task_helper as alf
+import models.instructions_processed_LP.ALFRED_task_helper as alf
 import pickle
 import json
 import string

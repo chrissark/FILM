@@ -155,6 +155,7 @@ def get_args():
     parser.add_argument('--shuffle', dest='shuffle', action='store_true')
     parser.add_argument('--gpu', dest='gpu', action='store_true')
     parser.add_argument('--num_threads', type=int, default=1)
+    parser.add_argument("--reward_config", type=str, default="models/config/reward.json")
 
     # eval params
     parser.add_argument('--max_steps', type=int, default=1000, help='max steps before episode termination')

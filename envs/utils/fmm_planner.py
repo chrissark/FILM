@@ -70,6 +70,10 @@ class FMMPlanner():
         return
 
     def set_multi_goal(self, goal_map):
+        # self.traversible stores binary array in which 1 means traversable cell
+        # traversible_ma contains masked array in which all 0 elements are hide
+        # it seems that the distance is calculated from the all goals to the all cells
+        # but then masked (impassable) cells are set the maximum distance
         traversible_ma = ma.masked_values(self.traversible * 1, 0)
         traversible_ma[goal_map == 1] = 0
         dd = skfmm.distance(traversible_ma, dx=1)
