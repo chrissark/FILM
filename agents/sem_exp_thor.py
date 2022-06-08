@@ -29,7 +29,9 @@ from models.segmentation.segmentation_helper import SemgnetationHelper
 #from models.depth.depth_helper import DepthHelper 
 import utils.control_helper as  CH
 
-from models.instructions_processed_LP.tasks_to_questions import prepositions, generate_questions_from_task, generate_questions_from_list_of_actions
+from models.instructions_processed_LP.tasks_to_questions import prepositions, generate_questions_from_task, \
+	generate_questions_from_list_of_actions
+from models.task_checker.task_checker import TaskChecker
 
 class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 	"""The Sem_Exp environment agent class. A seperate Sem_Exp_Env_Agent class
@@ -46,21 +48,24 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 		super().__init__(args, rank)
 
 		# initialize transform for RGB observations
-		self.res = transforms.Compose([transforms.ToPILImage(),
-					transforms.Resize((args.frame_height, args.frame_width),
-									  interpolation = Image.NEAREST)])
+		self.res = transforms.Compose([
+			transforms.ToPILImage(),
+			transforms.Resize(
+				(args.frame_height, args.frame_width), interpolation=Image.NEAREST
+			)
+		])
 		
 
 		# initializations for planning:
 		self.selem = skimage.morphology.square(self.args.obstacle_selem)
 		self.flattened = pickle.load(open("miscellaneous/flattened.p", "rb"))
 		
-		self.last_three_sidesteps = [None]*3
+		self.last_three_sidesteps = [None] * 3
 		self.picked_up = False
 		self.picked_up_cat = None
 		self.picked_up_mask = None
 		
-		self.transfer_cat = {'ButterKnife': 'Knife', "Knife":"ButterKnife"}
+		self.transfer_cat = {'ButterKnife': 'Knife', 'Knife': 'ButterKnife'}
 		
 		self.scene_names = scene_names
 		self.scene_pointer = 0
@@ -75,11 +80,13 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 		
 		self.test_dict = read_test_dict(self.args.test, self.args.appended, 'unseen' in self.args.eval_split)
 
-		#Segmentation
+		# Segmentation
 		self.seg = SemgnetationHelper(self)
 
-		#Depth
+		# Depth
 
+		# Task checker
+		self.task_checker = TaskChecker()
 	
 	def load_traj(self, scene_name):
 		json_dir = 'alfred_data_all/json_2.1.0/' + scene_name['task'] + '/pp/ann_' + str(scene_name['repeat_idx']) + '.json'
@@ -639,9 +646,8 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 
 		return traversible, start, start_o
 
-
 	def plan_act_and_preprocess(self, planner_inputs, goal_spotted):
-		#print("cur sidestep or der is ", self.side_step_order)
+		# print("cur sidestep or der is ", self.side_step_order)
 		self.fails_cur = 0
 		self.pointer = planner_inputs['list_of_actions_pointer']
 		"""Function responsible for planning, taking the action and
@@ -674,26 +680,33 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 		if planner_inputs["wait"]:
 			self.last_action_ogn = None
 			self.info["sensor_pose"] = [0., 0., 0.]
-			self.rotate_aftersidestep =  None
-			return np.zeros(self.obs.shape), 0., False, self.info, False, {'last_action_success': True, 'view_angle': self.camera_horizon,  'picked_up': self.picked_up,\
-																		   'steps_taken': self.steps_taken, 'broken_grid': self.broken_grid, 'actseq':{(self.args.from_idx + self.scene_pointer* self.args.num_processes + self.rank, self.traj_data['task_id']): self.actions[:1000]},\
-																		   'errs': self.errs, 'logs':self.logs, 'current_goal_sliced':self.cur_goal_sliced, 'move_until_visible_cycled': self.mvb_which_cycle != 0 and self.mvb_num_in_cycle==0, 'delete_lamp': False,
-																		   'fails_cur': 0}		
+			self.rotate_aftersidestep = None
+			return np.zeros(self.obs.shape), 0., False, self.info, False, {
+				'last_action_success': True, 'view_angle': self.camera_horizon, 'picked_up': self.picked_up,
+				'steps_taken': self.steps_taken, 'broken_grid': self.broken_grid,
+				'actseq': {
+					(
+						self.args.from_idx + self.scene_pointer * self.args.num_processes + self.rank,
+						self.traj_data['task_id']
+					): self.actions[:1000]
+				},
+				'errs': self.errs, 'logs': self.logs, 'current_goal_sliced': self.cur_goal_sliced,
+				'move_until_visible_cycled': self.mvb_which_cycle != 0 and self.mvb_num_in_cycle == 0,
+				'delete_lamp': False, 'fails_cur': 0
+			}
 
 		else:
 			pass
 
-		
 		self._visualize(planner_inputs)
 
 		goal_success = False
 		keep_consecutive = False
 
-
-
-		if self.side_step_order in [1,2]:
+		if self.side_step_order in [1, 2]:
 			prev_side_step_order = copy.deepcopy(self.side_step_order)
-			obs, rew, done, info, success, target_instance, err = self.side_step(self.step_dir, cur_start_o, cur_start, traversible)
+			obs, rew, done, info, success, target_instance, err = \
+				self.side_step(self.step_dir, cur_start_o, cur_start, traversible)
 			obs, seg_print = self.preprocess_obs_success(success, obs)
 			self.info = info
 			self.interaction_mask = None
@@ -701,15 +714,14 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 			if prev_side_step_order == 2:
 				opp_side_step = self.opp_side_step
 
-
 			if self.args.use_sem_seg:
 				self.print_log("obj type for mask is :", self.goal_idx2cat[self.goal_idx])
-				self.interaction_mask = self.seg.sem_seg_get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
+				self.interaction_mask = \
+					self.seg.sem_seg_get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
 			else:
 				self.interaction_mask = self.seg.get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
 			
-			if prev_side_step_order == 2: 
-
+			if prev_side_step_order == 2:
 				pointer = planner_inputs['list_of_actions_pointer']
 				
 				if self.is_visible_from_mask(self.interaction_mask):
@@ -718,36 +730,39 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 					visible = False
 
 				if not(pointer in self.caution_pointers):
-					self.execute_interaction = goal_spotted and visible 
-				else: 
+					self.execute_interaction = goal_spotted and visible
+				else:
 					whether_center = self.whether_center()
-					self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0 and whether_center 
+					self.execute_interaction = \
+						goal_spotted and visible and self.prev_number_action == 0 and whether_center
 					if opp_side_step:
-						self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0 
+						self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0
+				if self.execute_interaction:
+					checker_verdict = self.task_checker(self.event.frame.copy(), planner_inputs["list_of_actions"][pointer])
+					self.execute_interaction = self.execute_interaction and checker_verdict
 
 			else:
-				self.execute_interaction =  False
+				self.execute_interaction = False
 
 			if self.side_step_order == 0:
 				side_stepped = self.step_dir
 
-
-		elif self.lookDownUpLeft_count in range(1,3):#in 1,2,3
+		elif self.lookDownUpLeft_count in range(1, 3):  # in 1,2,3
 			if self.args.debug_local:
 				self.print_log("Tried to lookdownupleft")
 
-			if self.lookDownUpLeft_count ==1:
+			if self.lookDownUpLeft_count == 1:
 				action = "LookUp_15"
 				cur_hor = np.round(self.camera_horizon, 4)
 				obs, rew, done, info, success, _, target_instance, err, _ = self.set_back_to_angle(0)
-				self.lookDownUpLeft_count +=1
-			elif self.lookDownUpLeft_count ==2:
-				#look down back to 45
+				self.lookDownUpLeft_count += 1
+			elif self.lookDownUpLeft_count == 2:
+				# look down back to 45
 				cur_hor = np.round(self.camera_horizon, 4)
 				obs, rew, done, info, success, _, target_instance, err, _ = self.set_back_to_angle(45)
 				action = "RotateLeft_90"
 				obs, rew, done, info, success, _, target_instance, err, _ = \
-							self.va_interact_new("RotateLeft_90")
+					self.va_interact_new("RotateLeft_90")
 				self.lookDownUpLeft_count = 0
 				
 			obs, seg_print = self.preprocess_obs_success(success, obs)
@@ -755,38 +770,36 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 			self.info = info
 			self.execute_interaction = False
 			self.interaction_mask = None
-			
 		
-		elif planner_inputs['consecutive_interaction'] != None:
+		elif planner_inputs['consecutive_interaction'] is not None:
 			if self.args.debug_local:
 				self.print_log("consec action")
 			
 			target_object_type = planner_inputs['consecutive_target']
 			
-			obs, rew, done, info, success, err= self.consecutive_interaction(planner_inputs['consecutive_interaction'], target_object_type)
+			obs, rew, done, info, success, err = self.consecutive_interaction(
+				planner_inputs['consecutive_interaction'], target_object_type
+			)
 			goal_success = success
 			self.last_action_ogn = planner_inputs['consecutive_interaction']
 				
 			self.execute_interaction = False
 			
-			
-			
-		elif planner_inputs['consecutive_interaction'] == None and self.execute_interaction:
-			#Do the deterministic interaction here
+		elif planner_inputs['consecutive_interaction'] is None and self.execute_interaction:
+			# Do the deterministic interaction here
 			list_of_actions = planner_inputs['list_of_actions']
 			pointer = planner_inputs['list_of_actions_pointer']
 			interaction = list_of_actions[pointer][1]
 				
-			if interaction == None:
+			if interaction is None:
 				pass
 			else:              
-				obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new(interaction, self.interaction_mask)
+				obs, rew, done, info, success, _, target_instance, err, _ = \
+					self.va_interact_new(interaction, self.interaction_mask)
 				self.execute_interaction = False
 				self.last_action_ogn = interaction
 				if success:
 					goal_success = True
-				
-
 				
 				obs_temp, seg_print = self.preprocess_obs_success(success, obs)
 
@@ -794,7 +807,8 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 					self.picked_up = True
 					self.picked_up_cat = self.goal_idx
 					if self.args.use_sem_seg:
-						self.picked_up_mask = self.seg.sem_seg_get_instance_mask_from_obj_type_largest_only(self.goal_name)
+						self.picked_up_mask = \
+							self.seg.sem_seg_get_instance_mask_from_obj_type_largest_only(self.goal_name)
 					else:
 						self.picked_up_mask = self.seg.get_instance_mask_from_obj_type_largest(self.goal_name)
 					obs_temp, seg_print = self.preprocess_obs_success(success, obs)
@@ -811,123 +825,135 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 				obs = obs_temp
 
 				self.info = info
-	
 			
 		else:
-			if self.prev_number_action !=0:
+			if self.prev_number_action != 0:
 				number_action = self._plan(planner_inputs, self.steps, goal_spotted, planner_inputs['newly_goal_set'])
-				action_dict = {0: "<<stop>>", 1: "MoveAhead_25", 2:"RotateLeft_90", 3:"RotateRight_90", 4: "LookDown_90", 5:"LookDownUpLeft"}
+				action_dict = {
+					0: "<<stop>>", 1: "MoveAhead_25", 2: "RotateLeft_90", 3: "RotateRight_90",
+					4: "LookDown_90", 5: "LookDownUpLeft"
+				}
 				action = action_dict[number_action]
 				if number_action == 0:
 					self.prev_number_action = 0
 			else:
-				number_action = 100 #stop outputted before
+				number_action = 100  # stop outputted before
 				action = "stopAction"
 			
-			repeated_rotation = (not(self.last_three_sidesteps[0] is None) and not(self.last_three_sidesteps[1] is None)) and \
-				"Rotate" in self.last_three_sidesteps[1] and self.prev_sidestep_success == False
-			
-			
-			if self.prev_number_action==0:  #stop outputted now or before
-				 if (self.args.approx_error_message and not(self.last_success) and self.last_action_ogn in ["OpenObject", "CloseObject"] ) or (not(self.args.approx_error_message) and self.last_err=="Object failed to open/close successfully."):
-					 self.update_loc(planner_inputs)
-					 obs, rew, done, info, success, target_instance, err = self.move_behind()
-					 if self.args.debug_local:
-						 self.print_log("Moved behind!")
-					 
-				 elif not(self.args.no_rotate_sidestep) and (not(self.last_three_sidesteps[0] is None) and self.prev_sidestep_success == False):
-					 #Rotate to the failed direction 
-					 if self.args.debug_local:
-						 self.print_log("rotating because sidestepping failed")
-					 self.update_loc(planner_inputs)
-					 if self.last_three_sidesteps[0] == 'right':
-						 sdroate_direction = "Right"
-					 elif self.last_three_sidesteps[0] == 'left':
-						 sdroate_direction = "Left"
-					 obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new("Rotate" +sdroate_direction+ "_90")
-					 self.update_last_three_sidesteps("Rotate" +sdroate_direction)
-				 
-				 elif self.is_visible_from_mask(self.interaction_mask): #Must be cautious pointers
-					 #sidestep
-					 self.update_loc(planner_inputs)
-					 wd = self.which_direction()
-					 if self.args.debug_local:
-						 self.print_log("wd is ", wd)
-					 if wd <= 100:
-						 step_dir = 'left'
-						 if self.args.debug_local:
-							 self.print_log("sidestepping to left")
-					 elif wd > 200:
-						 step_dir = 'right'
-						 if self.args.debug_local:
-							 self.print_log("sidestepping to right")
-					 else:
-						 step_dir = None
-						 if self.args.debug_local:
-							 self.print_log("skipping sidestepping")
-					 if not(self.args.no_opp_sidestep) and self.last_three_sidesteps == ['left', 'right', 'left'] or self.last_three_sidesteps == ['right', 'left', 'right']:
-						 self.opp_side_step = True
-						 
-						 if step_dir == None:
-							 opp_step_dir = None
-							 obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new("LookUp_0") #pass
-						 else:
-							 if step_dir == 'left':
-								 opp_step_dir = 'right'
-							 else:
-								 opp_step_dir = 'left'
-							 obs, rew, done, info, success, target_instance, err = self.side_step(opp_step_dir, cur_start_o, cur_start, traversible)
-						 side_stepped = opp_step_dir
-					 else:
-						 self.opp_side_step = False
-						 if not(step_dir is None):
-							 obs, rew, done, info, success, target_instance, err = self.side_step(step_dir, cur_start_o, cur_start, traversible)
-						 else:
-							 obs, rew, done, info, success, _, target_instance, err, _=  self.va_interact_new("LookUp_0") #pass
-						 side_stepped = step_dir
-					 if self.args.debug_local:
-						 self.print_log("last three side stepped ", self.last_three_sidesteps) 
-					 
-				 else: #not visible
-					 moved_until_visible = True
-					 if self.args.debug_local:
-						 self.print_log("moving until visible")
-						 self.print_log("current horizon is ", self.camera_horizon)
-						 self.print_log("move until visible order is ", self.move_until_visible_order)
-					 self.update_loc(planner_inputs)
-					 obs, rew, done, info, success, target_instance, err  = self.move_until_visible()
-					 self.mvb_num_in_cycle +=1
-					 if self.mvb_num_in_cycle == 12:
-						 self.print_log("Went through one cycle of move until visible, step num is ", self.steps_taken)
-						 self.mvb_which_cycle +=1
-						 self.mvb_num_in_cycle = 0
-						 if self.args.delete_from_map_after_move_until_visible:
-							 self.prev_number_action = 100 #Release "stop outputted"
-			
-					
-			else:          #stop not ouputted   
+			repeated_rotation = \
+				(not(self.last_three_sidesteps[0] is None) and not(self.last_three_sidesteps[1] is None)) \
+				and "Rotate" in self.last_three_sidesteps[1] and self.prev_sidestep_success is False
+
+			if self.prev_number_action == 0:  # stop outputted now or before
+				if (
+						self.args.approx_error_message and not self.last_success
+						and self.last_action_ogn in ["OpenObject", "CloseObject"]
+				) or (
+						not self.args.approx_error_message
+						and self.last_err == "Object failed to open/close successfully."
+				):
+					self.update_loc(planner_inputs)
+					obs, rew, done, info, success, target_instance, err = self.move_behind()
+					if self.args.debug_local:
+						self.print_log("Moved behind!")
+
+				elif (
+						not self.args.no_rotate_sidestep
+						and (not(self.last_three_sidesteps[0] is None) and self.prev_sidestep_success is False)
+				):
+					# Rotate to the failed direction
+					if self.args.debug_local:
+						self.print_log("rotating because sidestepping failed")
+					self.update_loc(planner_inputs)
+					if self.last_three_sidesteps[0] == 'right':
+						sdroate_direction = "Right"
+					elif self.last_three_sidesteps[0] == 'left':
+						sdroate_direction = "Left"
+					obs, rew, done, info, success, _, target_instance, err, _ = \
+						self.va_interact_new("Rotate" + sdroate_direction + "_90")
+					self.update_last_three_sidesteps("Rotate" + sdroate_direction)
+
+				elif self.is_visible_from_mask(self.interaction_mask):  # Must be cautious pointers
+					# sidestep
+					self.update_loc(planner_inputs)
+					wd = self.which_direction()
+					if self.args.debug_local:
+						self.print_log("wd is ", wd)
+					if wd <= 100:
+						step_dir = 'left'
+						if self.args.debug_local:
+							self.print_log("sidestepping to left")
+					elif wd > 200:
+						step_dir = 'right'
+						if self.args.debug_local:
+							self.print_log("sidestepping to right")
+					else:
+						step_dir = None
+						if self.args.debug_local:
+							self.print_log("skipping sidestepping")
+					if (
+							not self.args.no_opp_sidestep and self.last_three_sidesteps == ['left', 'right', 'left']
+							or self.last_three_sidesteps == ['right', 'left', 'right']
+					):
+						self.opp_side_step = True
+
+						if step_dir is None:
+							opp_step_dir = None
+							obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new("LookUp_0")  # pass
+						else:
+							if step_dir == 'left':
+								opp_step_dir = 'right'
+							else:
+								opp_step_dir = 'left'
+							obs, rew, done, info, success, target_instance, err = \
+								self.side_step(opp_step_dir, cur_start_o, cur_start, traversible)
+						side_stepped = opp_step_dir
+					else:
+						self.opp_side_step = False
+						if not(step_dir is None):
+							obs, rew, done, info, success, target_instance, err = \
+								self.side_step(step_dir, cur_start_o, cur_start, traversible)
+						else:
+							obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new("LookUp_0")  # pass
+						side_stepped = step_dir
+					if self.args.debug_local:
+						self.print_log("last three side stepped ", self.last_three_sidesteps)
+
+				else:  # not visible
+					moved_until_visible = True
+					if self.args.debug_local:
+						self.print_log("moving until visible")
+						self.print_log("current horizon is ", self.camera_horizon)
+						self.print_log("move until visible order is ", self.move_until_visible_order)
+					self.update_loc(planner_inputs)
+					obs, rew, done, info, success, target_instance, err = self.move_until_visible()
+					self.mvb_num_in_cycle += 1
+					if self.mvb_num_in_cycle == 12:
+						self.print_log("Went through one cycle of move until visible, step num is ", self.steps_taken)
+						self.mvb_which_cycle += 1
+						self.mvb_num_in_cycle = 0
+						if self.args.delete_from_map_after_move_until_visible:
+							self.prev_number_action = 100  # Release "stop outputted"
+
+			else:  # stop not ouputted
 				if action == "LookDownUpLeft":
 					cur_hor = np.round(self.camera_horizon, 4)
-					if abs(cur_hor-45)>5:
+					if abs(cur_hor - 45) > 5:
 						obs, rew, done, info, success, _, target_instance, err, _ = self.set_back_to_angle(45)
 					else:
-						obs, rew, done, info, success, _, target_instance, err, _ = \
-									self.va_interact_new("LookUp_0")
+						obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new("LookUp_0")
 
 					self.lookDownUpLeft_count = 1
-					
 
 				else:
-					obs, rew, done, info, success, _, target_instance, err, _ = \
-						self.va_interact_new(action)
-					
-					
-			  
+					obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new(action)
+
 			####################
 			obs, seg_print = self.preprocess_obs_success(success, obs)
 			if self.args.use_sem_seg:
 				self.print_log("obj type for mask is :", self.goal_idx2cat[self.goal_idx])
-				self.interaction_mask = self.seg.sem_seg_get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
+				self.interaction_mask = \
+					self.seg.sem_seg_get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
 			else:
 				self.interaction_mask = self.seg.get_instance_mask_from_obj_type(self.goal_idx2cat[self.goal_idx])
 			
@@ -941,52 +967,65 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 			interaction = list_of_actions[pointer][1]
 
 			if self.args.stricter_visibility <= 1.5:
-				if self.is_visible_from_mask(self.interaction_mask, stricer_visibility_dist=self.args.stricter_visibility) and self.whether_center():
+				if self.is_visible_from_mask(
+						self.interaction_mask, stricer_visibility_dist=self.args.stricter_visibility
+				) and self.whether_center():
 					self.prev_number_action == 0
 
 			pointer = planner_inputs['list_of_actions_pointer']
-			
+
 			if not(pointer in self.caution_pointers):
 				self.execute_interaction = goal_spotted and visible 
-			else: #caution pointers
+			else:  # caution pointers
 				whether_center = self.whether_center()
 				self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0 and whether_center 
 			
 				if opp_side_step:
-					self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0 
+					self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0
+			if self.execute_interaction:
+				checker_verdict = self.task_checker(self.event.frame.copy(), planner_inputs["list_of_actions"][pointer])
+				self.execute_interaction = self.execute_interaction and checker_verdict
 
-		delete_lamp = (self.mvb_num_in_cycle !=0)  and (self.goal_name == 'FloorLamp') and (self.action_received == "ToggleObjectOn")
+		delete_lamp = \
+			(self.mvb_num_in_cycle != 0) and (self.goal_name == 'FloorLamp') \
+			and (self.action_received == "ToggleObjectOn")
 		if self.args.no_delete_lamp:
 			delete_lamp = False
 
-		if not(moved_until_visible):
+		if not moved_until_visible:
 			self.mvb_num_in_cycle = 0
 			self.mvb_which_cycle = 0
 
-
-
-		self.rotate_aftersidestep =sdroate_direction
-		next_step_dict = {'keep_consecutive': keep_consecutive, \
-								  'last_action_success': self.event.metadata['lastActionSuccess'], 'view_angle': self.camera_horizon, 
-								  'picked_up': self.picked_up, 'errs': self.errs, 'steps_taken': self.steps_taken, 'broken_grid':self.broken_grid, 'actseq':{(self.args.from_idx + self.scene_pointer* self.args.num_processes + self.rank, self.traj_data['task_id']): self.actions[:1000]},
-								  'logs':self.logs,  'current_goal_sliced':self.cur_goal_sliced, 'move_until_visible_cycled': self.mvb_which_cycle != 0 and self.mvb_num_in_cycle==0, 'delete_lamp': delete_lamp,
-								  'fails_cur': self.fails_cur}
+		self.rotate_aftersidestep = sdroate_direction
+		next_step_dict = {
+			'keep_consecutive': keep_consecutive, 'last_action_success': self.event.metadata['lastActionSuccess'],
+			'view_angle': self.camera_horizon, 'picked_up': self.picked_up, 'errs': self.errs,
+			'steps_taken': self.steps_taken, 'broken_grid': self.broken_grid,
+			'actseq': {
+				(
+					self.args.from_idx + self.scene_pointer * self.args.num_processes + self.rank,
+					self.traj_data['task_id']
+				): self.actions[:1000]
+			},
+			'logs': self.logs, 'current_goal_sliced': self.cur_goal_sliced,
+			'move_until_visible_cycled': self.mvb_which_cycle != 0 and self.mvb_num_in_cycle == 0,
+			'delete_lamp': delete_lamp, 'fails_cur': self.fails_cur
+		}
 		self.last_err = err
-		if self.side_step_order ==0 and side_stepped is None:
+		if self.side_step_order == 0 and side_stepped is None:
 			self.prev_sidestep_success = True
 			self.update_last_three_sidesteps(side_stepped)
 				
 		if self.args.debug_local:
-			if err!="":
-				self.print_log("step: " , str(self.steps_taken), ", err is ", err)
+			if err != "":
+				self.print_log("step: ", str(self.steps_taken), ", err is ", err)
 				self.print_log("action taken in step ", str(self.steps_taken), ": ",)
 
 		self.info = info
 
-		
 		list_of_actions = planner_inputs['list_of_actions']
 		pointer = planner_inputs['list_of_actions_pointer']
-		if goal_success and pointer +1 < len(list_of_actions):
+		if goal_success and pointer + 1 < len(list_of_actions):
 			self.print_log("pointer increased goal name ", list_of_actions[pointer+1])
 		
 		return obs, rew, done, info, goal_success, next_step_dict
