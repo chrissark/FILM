@@ -13,7 +13,10 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     result = pickle.load(open(args.recs_filename, 'rb'))
-    print(result)
+    for res_dict in result:
+        if res_dict["success"]:
+            print(res_dict)
+
     # num of episodes
     print(f"Number of episodes: {len(result)}")
     # num of succeeded episodes

@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torchvision.transforms as T
 
@@ -64,8 +66,15 @@ class TaskChecker:
 
     def __init__(
             self,
-            mdetr_ckpt_path="models/task_checker/BEST_checkpoint.pth"
+            mdetr_ckpt_path="models/task_checker/BEST_checkpoint.pth",
+            debug=False,
     ):
+        self.debug = debug
+        self.log_dir_path = None
+        if self.debug:
+            self.image_cnt = 0
+        self.prev_steps_taken = -1  # For the hack
+
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
@@ -78,13 +87,29 @@ class TaskChecker:
         checkpoint = torch.load(mdetr_ckpt_path, map_location="cpu")
         self.mdetr.load_state_dict(checkpoint["model"], strict=True)
         self.mdetr.eval()  # We use the already trained MDETR
-        n_parameters = sum(
-            p.numel() for p in self.mdetr.parameters() if p.requires_grad
-        )
-        print("MDETR was loaded successfully! Number of params:", n_parameters)
-        print(f"The device is {self.device}")
+        print(f"MDETR was loaded from {mdetr_ckpt_path}")
 
-    def __call__(self, rgb: np.ndarray, subgoal: Tuple):
+        if self.debug:
+            n_parameters = sum(
+                p.numel() for p in self.mdetr.parameters() if p.requires_grad
+            )
+            print("Number of params:", n_parameters)
+            print(f"The device is {self.device}")
+
+    def set_log_dir_path(self, log_dir_path):
+        """
+        This function is obligatory to call
+        in Sem_Exp_Env_Agent_Thor.load_initial_scene()
+        """
+
+        # TODO: add conditional creation
+        self.log_dir_path = "task_checker_logs/" + log_dir_path
+        pictures_path = self.log_dir_path + "pictures/"
+        os.makedirs(pictures_path, exist_ok=True)
+        self.image_cnt = 0
+        self.prev_steps_taken = -1
+
+    def __call__(self, rgb: np.ndarray, subgoal: Tuple, steps_taken: int):
         # Make the object lowercase
         obj = subgoal[0].lower()
         subgoal = (obj, subgoal[1])
@@ -111,8 +136,31 @@ class TaskChecker:
         # We use multi-head version since its performance is better
         ques_type_pred = outputs["pred_answer_type"].argmax(-1).item()
         ques_type_pred = TaskChecker.ques_id2type[ques_type_pred]
-        verdict = outputs[f"pred_answer_{ques_type_pred}"].sigmoid() > 0.5
-        return verdict.item()
+        prob = outputs[f"pred_answer_{ques_type_pred}"].sigmoid().item()
+        verdict = prob > 0.5
+
+        if self.debug:
+            ques_logs_path = self.log_dir_path + "ques_and_ans.txt"
+            self.image_cnt += 1
+            img_path = self.log_dir_path + f"pictures/{self.image_cnt}.png"
+
+            with open(ques_logs_path, "a") as f:
+                f.write(
+                    question[0] + f"\t{verdict}" + f"\tprob={prob:.5f}"
+                    + f"\tsteps_taken={steps_taken}\n"
+                )
+                if self.prev_steps_taken + 1 == steps_taken and not verdict:
+                    f.write(
+                        "Warning! FILM stuck! Explicitly allowing interaction\n"
+                    )
+            Image.fromarray(rgb).save(img_path)
+
+        # This is the hack. When FILM stuck, explicitly allow to interact
+        if self.prev_steps_taken + 1 == steps_taken and not verdict:
+            verdict = True
+        self.prev_steps_taken = steps_taken
+
+        return verdict
 
 
 # If you want to test `TaskChecker`, run the code below.

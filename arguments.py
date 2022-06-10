@@ -142,6 +142,12 @@ def get_args():
                         help="floor_thr in cm")
     parser.add_argument('--version', type=str, default="v1.1")
 
+    # Checker's arguments
+    parser.add_argument("--no_task_checker", action="store_true")
+    parser.add_argument("--mdetr_ckpt_path", type=str, default="models/task_checker/BEST_checkpoint.pth")
+    # If you use debug, check the `log_path` in `TaskChecker` and change it if you need
+    parser.add_argument("--debug_task_checker", action="store_true")
+
     ###############
     ## Arguments from ALFRED (no duplicate with OGN arguments)
     ###############

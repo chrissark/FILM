@@ -86,8 +86,15 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 		# Depth
 
 		# Task checker
-		self.task_checker = TaskChecker()
-	
+		self.use_task_checker = not args.no_task_checker
+		if self.use_task_checker:
+			self.task_checker = TaskChecker(
+				mdetr_ckpt_path=args.mdetr_ckpt_path,
+				debug=args.debug_task_checker,
+			)
+		else:
+			self.task_checker = None
+
 	def load_traj(self, scene_name):
 		json_dir = 'alfred_data_all/json_2.1.0/' + scene_name['task'] + '/pp/ann_' + str(scene_name['repeat_idx']) + '.json'
 		traj_data = json.load(open(json_dir))
@@ -138,7 +145,9 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 		self.picked_up_cat = None
 		self.picked_up_mask = None
 
-		episode_no = self.args.from_idx + self.scene_pointer* self.args.num_processes + self.rank        
+		episode_no = self.args.from_idx + self.scene_pointer * self.args.num_processes + self.rank
+		if self.use_task_checker:
+			self.task_checker.set_log_dir_path(self.args.eval_split + "/" + self.args.dn + "/" + str(episode_no) + "/")
 
 		try:
 			traj_data = self.load_traj(self.scene_names[self.scene_pointer]); r_idx = self.scene_names[self.scene_pointer]['repeat_idx']
@@ -738,7 +747,10 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 					if opp_side_step:
 						self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0
 				if self.execute_interaction:
-					checker_verdict = self.task_checker(self.event.frame.copy(), planner_inputs["list_of_actions"][pointer])
+					checker_verdict = self.task_checker(
+						self.event.frame.copy(), planner_inputs["list_of_actions"][pointer], self.steps_taken
+					)
+					self.print_log(f"checker's verdict is {checker_verdict}")
 					self.execute_interaction = self.execute_interaction and checker_verdict
 
 			else:
@@ -983,7 +995,10 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
 				if opp_side_step:
 					self.execute_interaction = goal_spotted and visible and self.prev_number_action == 0
 			if self.execute_interaction:
-				checker_verdict = self.task_checker(self.event.frame.copy(), planner_inputs["list_of_actions"][pointer])
+				checker_verdict = self.task_checker(
+					self.event.frame.copy(), planner_inputs["list_of_actions"][pointer], self.steps_taken
+				)
+				self.print_log(f"checker's verdict is {checker_verdict}")
 				self.execute_interaction = self.execute_interaction and checker_verdict
 
 		delete_lamp = \
