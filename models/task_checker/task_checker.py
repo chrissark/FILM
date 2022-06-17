@@ -109,22 +109,44 @@ class TaskChecker:
         self.image_cnt = 0
         self.prev_steps_taken = -1
 
-    def __call__(self, rgb: np.ndarray, subgoal: Tuple, steps_taken: int):
+    def __call__(self, rgb: np.ndarray, subgoal: Tuple, steps_taken: int,
+                 approximate_success: bool = False, prev_obj: str = None):
         # Make the object lowercase
         obj = subgoal[0].lower()
         subgoal = (obj, subgoal[1])
 
+        if prev_obj is not None:
+            prev_obj = prev_obj.lower()
+
         # Apply standard transform
         img = TaskChecker.transform(rgb).unsqueeze(0)  # Added batch dimension
 
-        # For now, we only check the ability to pick up an object
-        # and the existence of an object
-        if subgoal[1] == "PickupObject":
-            question = generate_questions_from_task(subgoal)[0]
-        elif subgoal[1] in ("OpenObject", "ToggleOn", "SliceObject"):
-            question = generate_existence_question(subgoal[0])[0]
+        # We check the ability to pick up an object, the existence of an object
+        # and success of basic actions
+
+        # in some cases verdict is the inverted answer
+        invert_answer = False
+
+        if approximate_success:
+            if subgoal[1] == "PutObject":
+                assert prev_obj is not None
+                question = generate_questions_from_task(subgoal, prev_obj)[0]
+            elif subgoal[1] == "PickupObject":
+                question = generate_questions_from_task(subgoal)[1]
+            elif subgoal[1] in ("ToggleObjectOn", "OpenObject", "Slice"):
+                question = generate_questions_from_task(subgoal)[0]
+            elif subgoal[1] in ("ToggleObjectOff", "CloseObject"):
+                question = generate_questions_from_task(subgoal)[0]
+                invert_answer = True
+            else:
+                return True
         else:
-            return True  # Not implemented
+            if subgoal[1] == "PickupObject":
+                question = generate_questions_from_task(subgoal)[0]
+            elif subgoal[1] in ("OpenObject", "ToggleObjectOn", "SliceObject"):
+                question = generate_existence_question(subgoal[0])[0]
+            else:
+                return True  # Not implemented
 
         img = img.to(self.device)
         question = [question, ]  # Added batch dimension
@@ -154,6 +176,9 @@ class TaskChecker:
                         "Warning! FILM stuck! Explicitly allowing interaction\n"
                     )
             Image.fromarray(rgb).save(img_path)
+
+        if invert_answer:
+            verdict = not verdict
 
         # This is the hack. When FILM stuck, explicitly allow to interact
         if self.prev_steps_taken + 1 == steps_taken and not verdict:
