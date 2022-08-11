@@ -124,7 +124,7 @@ mv Pretrained_Models_FILM/best_model_multi.pt models/semantic_policy/best_model_
 To use a better perfoming model trained with a new seed (27.80%),
 
 ```
-mv Pretrained_Models_FILM/best_model_multi.pt models/semantic_policy/new_best_model.pt
+mv Pretrained_Models_FILM/new_best_model.pt models/semantic_policy/best_model_multi.pt
 ```
 
 ## Run FILM on Valid/ Tests Sets
@@ -341,7 +341,7 @@ Avg  |  24.87 | 26.51
 Most of [alfred_utils](https://github.com/soyeonm/FILM/control_helper/alfred_utils) comes from [Mohit Shridhar's ALFRED repository](https://github.com/askforalfred/alfred).
 [models/depth](https://github.com/soyeonm/FILM/tree/public/models/depth) comes from [Valts Blukis' HLSM](https://github.com/valtsblukis/hlsm).
 
-Code for semantic mapping comes from [Devendra Singh Chaplot's OGN](https://github.com/devendrachaplot/OGN)
+Code for semantic mapping comes from [Devendra Singh Chaplot's OGN](https://github.com/devendrachaplot/Object-Goal-Navigation)
 
 ### Bibtex:
 ```
