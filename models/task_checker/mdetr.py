@@ -10,16 +10,16 @@ import torch.distributed
 import torch.nn.functional as F
 from torch import nn
 
-# import util.dist as dist
-# from util import box_ops
-# from util.metrics import accuracy
-from models.task_checker.util.misc import NestedTensor, interpolate
+#import util.dist as dist
+#from util import box_ops
+#from util.metrics import accuracy
+from models.task_checker.util.misc import NestedTesnsor, interpolate
 
-from models.task_checker.backbone import build_backbone
+from .backbone import build_backbone
 # from .matcher import build_matcher
 # from .postprocessors import build_postprocessors
 # from .segmentation import DETRsegm, dice_loss, sigmoid_focal_loss
-from models.task_checker.transformer import build_transformer
+from .transformer import build_transformer
 
 
 class MDETR(nn.Module):
@@ -84,9 +84,9 @@ class MDETR(nn.Module):
                 self.answer_preposition_head = nn.Linear(hidden_dim, 37)
                 self.answer_material_head = nn.Linear(hidden_dim, 12)
             elif qa_dataset == "alfred":
-                self.answer_type_head = nn.Linear(hidden_dim, 7)
+                self.answer_type_head = nn.Linear(hidden_dim, 6)
                 self.answer_existence_head = nn.Linear(hidden_dim, 1)
-                self.answer_pickupable_head = nn.Linear(hidden_dim, 1)
+                # self.answer_pickupable_head = nn.Linear(hidden_dim, 1)
                 self.answer_picked_up_head = nn.Linear(hidden_dim, 1)
                 self.answer_receptacle_head = nn.Linear(hidden_dim, 1)
                 self.answer_opened_head = nn.Linear(hidden_dim, 1)
@@ -169,16 +169,16 @@ class MDETR(nn.Module):
                     out["pred_answer_preposition"] = self.answer_preposition_head(answer_embeds[:, 2])
                     out["pred_answer_material"] = self.answer_material_head(answer_embeds[:, 3])
                 elif self.qa_dataset == "alfred":
-                    answer_embeds = hs[0, :, -8:]
-                    hs = hs[:, :, :-8]
+                    answer_embeds = hs[0, :, -7:]
+                    hs = hs[:, :, :-7]
                     out["pred_answer_type"] = self.answer_type_head(answer_embeds[:, 0])
                     out["pred_answer_existence"] = self.answer_existence_head(answer_embeds[:, 1]).squeeze(-1)
-                    out["pred_answer_pickupable"] = self.answer_pickupable_head(answer_embeds[:, 2]).squeeze(-1)
-                    out["pred_answer_picked_up"] = self.answer_picked_up_head(answer_embeds[:, 3]).squeeze(-1)
-                    out["pred_answer_receptacle"] = self.answer_receptacle_head(answer_embeds[:, 4]).squeeze(-1)
-                    out["pred_answer_opened"] = self.answer_opened_head(answer_embeds[:, 5]).squeeze(-1)
-                    out["pred_answer_toggled_on"] = self.answer_toggled_on_head(answer_embeds[:, 6]).squeeze(-1)
-                    out["pred_answer_sliced"] = self.answer_sliced_head(answer_embeds[:, 7]).squeeze(-1)
+                    # out["pred_answer_pickupable"] = self.answer_pickupable_head(answer_embeds[:, 2]).squeeze(-1)
+                    out["pred_answer_picked_up"] = self.answer_picked_up_head(answer_embeds[:, 2]).squeeze(-1)
+                    out["pred_answer_receptacle"] = self.answer_receptacle_head(answer_embeds[:, 3]).squeeze(-1)
+                    out["pred_answer_opened"] = self.answer_opened_head(answer_embeds[:, 4]).squeeze(-1)
+                    out["pred_answer_toggled_on"] = self.answer_toggled_on_head(answer_embeds[:, 5]).squeeze(-1)
+                    out["pred_answer_sliced"] = self.answer_sliced_head(answer_embeds[:, 6]).squeeze(-1)
                 else:
                     assert False, f"Invalid qa dataset {self.qa_dataset}"
             else:
@@ -318,7 +318,7 @@ class QACriterionAlfred(nn.Module):
         if self.split_qa_heads:
             self.gl_avg = {
                 "existence": [0, 0],
-                "pickupable": [0, 0],
+                # "pickupable": [0, 0],
                 "picked_up": [0, 0],
                 "receptacle": [0, 0],
                 "opened": [0, 0],
@@ -354,18 +354,18 @@ class QACriterionAlfred(nn.Module):
 
         is_existence, acc_existence = \
             QACriterionAlfred._calc_loss_and_acc(device, output, answers, 0, "existence", loss)
-        is_pickupable, acc_pickupable = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 1, "pickupable", loss)
+        # is_pickupable, acc_pickupable = \
+        #     QACriterionAlfred._calc_loss_and_acc(device, output, answers, 1, "pickupable", loss)
         is_picked_up, acc_picked_up = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 2, "picked_up", loss)
+            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 1, "picked_up", loss)
         is_receptacle, acc_receptacle = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 3, "receptacle", loss)
+            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 2, "receptacle", loss)
         is_opened, acc_opened = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 4, "opened", loss)
+            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 3, "opened", loss)
         is_toggled_on, acc_toggled_on = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 5, "toggled_on", loss)
+            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 4, "toggled_on", loss)
         is_sliced, acc_sliced = \
-            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 6, "sliced", loss)
+            QACriterionAlfred._calc_loss_and_acc(device, output, answers, 5, "sliced", loss)
 
         # Since the accuracy_answer_total is not precise (1 / batch_size limits it),
         # let's accumulate results from every batch and calculate real global average
@@ -374,8 +374,8 @@ class QACriterionAlfred(nn.Module):
             self.gl_avg["ans_type"][1] += type_acc.numel()
             self.gl_avg["existence"][0] += acc_existence[is_existence].sum().item()
             self.gl_avg["existence"][1] += is_existence.sum().item()
-            self.gl_avg["pickupable"][0] += acc_pickupable[is_pickupable].sum().item()
-            self.gl_avg["pickupable"][1] += is_pickupable.sum().item()
+            # self.gl_avg["pickupable"][0] += acc_pickupable[is_pickupable].sum().item()
+            # self.gl_avg["pickupable"][1] += is_pickupable.sum().item()
             self.gl_avg["picked_up"][0] += acc_picked_up[is_picked_up].sum().item()
             self.gl_avg["picked_up"][1] += is_picked_up.sum().item()
             self.gl_avg["receptacle"][0] += acc_receptacle[is_receptacle].sum().item()
@@ -389,7 +389,7 @@ class QACriterionAlfred(nn.Module):
 
         loss["accuracy_answer_total"] = (
             type_acc
-            * (is_existence * acc_existence + is_pickupable * acc_pickupable + is_picked_up * acc_picked_up +
+            * (is_existence * acc_existence + is_picked_up * acc_picked_up +
                is_receptacle * acc_receptacle + is_opened * acc_opened + is_toggled_on * acc_toggled_on +
                is_sliced * acc_sliced)
         ).sum() / type_acc.numel()

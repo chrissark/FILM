@@ -390,23 +390,39 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
         return obs, seg_print
 
     def consecutive_interaction(self, interaction, target_instance):
+        get_mdetr_verdict = False
         if interaction == "PutObject" and self.last_action_ogn == "OpenObject":
             self.interaction_mask = self.open_mask
         elif interaction == "CloseObject":
             self.interaction_mask = self.open_mask
         elif self.args.use_sem_seg:
             self.interaction_mask = self.seg.sem_seg_get_instance_mask_from_obj_type(target_instance)
+            get_mdetr_verdict = True
         else:
             self.interaction_mask = self.seg.get_instance_mask_from_obj_type(target_instance)
 
         obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new(interaction,
                                                                                          self.interaction_mask)
+
+        checker_verdict = True
+        if interaction in ("PickupObject", "OpenObject", "CloseObject", "ToggleObjectOn",
+                           "ToggleObjectOff", "SliceObject") and get_mdetr_verdict:
+            checker_verdict = self.task_checker(
+                self.event.frame.copy(),
+                (target_instance, interaction),
+                self.steps_taken,
+                approximate_success=True
+            )
+            success = success and checker_verdict
+
+
         self.last_action_ogn = interaction
 
         if self.last_action_ogn == "PickupObject" and not (success):
             self.interaction_mask = self.put_rgb_mask
             obs, rew, done, info, success, _, target_instance, err, _ = self.va_interact_new(interaction,
                                                                                              self.interaction_mask)
+
             self.last_action_ogn = interaction
 
         obs_temp, seg_print = self.preprocess_obs_success(success, obs)

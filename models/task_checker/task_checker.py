@@ -53,7 +53,7 @@ class TaskChecker:
         "schedule": "linear_with_warmup"
     }
     ques_id2type = [
-        "existence", "pickupable", "picked_up", "receptacle",
+        "existence", "picked_up", "receptacle",
         "opened", "toggled_on", "sliced"
     ]
 
@@ -143,7 +143,7 @@ class TaskChecker:
         else:
             #if subgoal[1] == "PickupObject":
             #    question = generate_questions_from_task(subgoal)[0]
-            if subgoal[1] in ("OpenObject", "ToggleObjectOn", "SliceObject"):
+            if subgoal[1] in ("OpenObject", "ToggleObjectOn", "SliceObject", "PickupObject"):
                 question = generate_existence_question(subgoal[0])[0]
             else:
                 return True  # Not implemented
