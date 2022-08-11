@@ -131,8 +131,8 @@ class TaskChecker:
             if subgoal[1] == "PutObject":
                 assert prev_obj is not None
                 question = generate_questions_from_task(subgoal, prev_obj)[0]
-            elif subgoal[1] == "PickupObject":
-                question = generate_questions_from_task(subgoal)[1]
+            #elif subgoal[1] == "PickupObject":
+            #    question = generate_questions_from_task(subgoal)[1]
             elif subgoal[1] in ("ToggleObjectOn", "OpenObject", "Slice"):
                 question = generate_questions_from_task(subgoal)[0]
             elif subgoal[1] in ("ToggleObjectOff", "CloseObject"):
@@ -141,9 +141,9 @@ class TaskChecker:
             else:
                 return True
         else:
-            if subgoal[1] == "PickupObject":
-                question = generate_questions_from_task(subgoal)[0]
-            elif subgoal[1] in ("OpenObject", "ToggleObjectOn", "SliceObject"):
+            #if subgoal[1] == "PickupObject":
+            #    question = generate_questions_from_task(subgoal)[0]
+            if subgoal[1] in ("OpenObject", "ToggleObjectOn", "SliceObject"):
                 question = generate_existence_question(subgoal[0])[0]
             else:
                 return True  # Not implemented
@@ -171,10 +171,10 @@ class TaskChecker:
                     question[0] + f"\t{verdict}" + f"\tprob={prob:.5f}"
                     + f"\tsteps_taken={steps_taken}\n"
                 )
-                if self.prev_steps_taken + 1 == steps_taken and not verdict:
-                    f.write(
-                        "Warning! FILM stuck! Explicitly allowing interaction\n"
-                    )
+                #if self.prev_steps_taken + 1 == steps_taken and not verdict:
+                #    f.write(
+                #        "Warning! FILM stuck! Explicitly allowing interaction\n"
+                #    )
             Image.fromarray(rgb).save(img_path)
 
         if invert_answer:

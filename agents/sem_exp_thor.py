@@ -1,6 +1,7 @@
 import math
 import os, sys
 import matplotlib
+
 if sys.platform == 'darwin':
     matplotlib.use("tkagg")
 else:
@@ -805,6 +806,7 @@ class Sem_Exp_Env_Agent_Thor(ThorEnvCode):
                 #        approximate_success=True,
                 #        prev_obj=planner_inputs["list_of_actions"][pointer-1][0]
                 #    )
+                checker_verdict = True
                 if interaction in ("PickupObject", "OpenObject", "CloseObject", "ToggleObjectOn",
                                      "ToggleObjectOff", "SliceObject"):
                     checker_verdict = self.task_checker(
